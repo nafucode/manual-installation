@@ -113,8 +113,12 @@ function splitZhEn(text: string): { zh: string; en: string } {
 /**
  * 尝试识别章节编号。匹配开头形如：
  *   1  /  1.  /  1.1  /  1.1.1  /  第一章  /  Chapter 1
+ * 但排除"数字.数字 + 单字母列表编号"的情形（例如 "4.1 a、"、"4.1 b."），
+ * 这种是章节里的列表项，不是新章节。
  */
 function matchSectionNumber(text: string): string | null {
+  // 排除子列表：如 "4.1 a、xxx" / "4.1 b, xxx" / "4.1 c." 这类段落编号
+  if (/^\s*\d+(?:\.\d+){0,3}\s+[a-zA-Z][\s、,\.。:：]/.test(text)) return null;
   const m1 = text.match(/^\s*(\d+(?:\.\d+){0,3})[\s.、:：]/);
   if (m1) return m1[1];
   const m2 = text.match(/^\s*第[一二三四五六七八九十百]+[章节]/);
@@ -122,6 +126,18 @@ function matchSectionNumber(text: string): string | null {
   const m3 = text.match(/^\s*Chapter\s+\d+/i);
   if (m3) return m3[0].trim();
   return null;
+}
+
+/**
+ * 判断"去掉编号后剩下的标题"是否是有效标题。
+ * 排除只剩单字母+标点残留（例如 "a,"、"a、"、"b."）——这种是列表项，不是章节标题。
+ */
+function isValidSectionTitle(rest: string): boolean {
+  const cleaned = rest.replace(/[\s、,\.。:：\-—]+/g, "");
+  if (cleaned.length < 2) return false;
+  // 只剩下单字母（如 a/b/c）算无效标题
+  if (/^[a-zA-Z]$/.test(cleaned)) return false;
+  return true;
 }
 
 /**
@@ -172,26 +188,30 @@ function parseHtmlToSections(html: string, fileName: string): ExtractResult {
       const imgs = Array.from(node.querySelectorAll("img"));
       const text = (node.textContent || "").trim();
 
-      // 尝试把段落识别为章节起点
-      if (text) {
+      // 尝试把段落识别为章节起点：整段较短 + 去编号后剩余标题有效
+      if (text && text.length <= 80) {
         const num = matchSectionNumber(text);
         if (num) {
           const title = text.replace(
             /^\s*\d+(?:\.\d+){0,3}[\s.、:：]?/,
             "",
           ).trim();
-          startSection(num, title || text);
-          totalParagraphs++;
-          // 章节标题本身也作为一块内容
-          const { zh, en } = splitZhEn(title || text);
-          if (zh || en) {
-            pushBlock({ kind: "text", zh, en, raw: text });
+          if (isValidSectionTitle(title)) {
+            startSection(num, title);
+            totalParagraphs++;
+            const { zh, en } = splitZhEn(title);
+            if (zh || en) {
+              pushBlock({ kind: "text", zh, en, raw: text });
+            }
+            continue;
           }
-        } else {
-          totalParagraphs++;
-          const { zh, en } = splitZhEn(text);
-          pushBlock({ kind: "text", zh, en, raw: text });
         }
+      }
+      // 普通段落
+      if (text) {
+        totalParagraphs++;
+        const { zh, en } = splitZhEn(text);
+        pushBlock({ kind: "text", zh, en, raw: text });
       }
 
       for (const img of imgs) {
@@ -1627,8 +1647,8 @@ function SectionView({
                     {translated ? (
                       <div
                         dir={isRtl ? "rtl" : "ltr"}
-                        className={`flex-1 text-ink-900 whitespace-pre-wrap border-l-2 border-gold-500/60 pl-2 ${
-                          isRtl ? "text-right border-l-0 border-r-2 pr-2 pl-0" : ""
+                        className={`flex-1 text-ink-900 whitespace-pre-wrap ${
+                          isRtl ? "text-right" : ""
                         }`}
                       >
                         {translated}
