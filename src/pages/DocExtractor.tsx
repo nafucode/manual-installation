@@ -16,6 +16,7 @@ import {
   Sparkles,
   FolderOpen,
   Save,
+  Printer,
 } from "lucide-react";
 import { useT, useI18n, localeOptions, type DictKey } from "@/i18n";
 import {
@@ -943,10 +944,39 @@ export default function DocExtractor() {
     if (f) doImportProject(f);
   };
 
+  /** 导出 PDF：调用浏览器打印对话框，配合内嵌打印 CSS 隐藏 UI 只保留正文 */
+  const doExportPdf = () => {
+    if (!result) return;
+    window.print();
+  };
+
   return (
     <div className="h-screen flex flex-col bg-[#F2F4F7]">
+      {/* 打印样式：调用 window.print() 时生效，隐藏 UI 只保留正文，A4 页面，章节自动分页 */}
+      <style>{`
+        @media print {
+          @page { size: A4; margin: 18mm 16mm; }
+          html, body { background: #fff !important; }
+          body * { visibility: hidden; }
+          .no-print, .no-print * { display: none !important; }
+          .print-area, .print-area * { visibility: visible; }
+          .print-area {
+            position: absolute !important;
+            inset: 0 !important;
+            overflow: visible !important;
+            height: auto !important;
+            background: #fff !important;
+          }
+          .print-area section { break-inside: avoid; page-break-inside: avoid; }
+          .print-area section + section { break-before: page; page-break-before: always; }
+          .print-area h2, .print-area h3 { break-after: avoid; page-break-after: avoid; }
+          .print-area img { max-width: 100% !important; height: auto !important; break-inside: avoid; page-break-inside: avoid; }
+          .print-area table { break-inside: avoid; page-break-inside: avoid; }
+          .print-area .no-print-inline { display: none !important; }
+        }
+      `}</style>
       {/* 顶栏 */}
-      <header className="h-14 shrink-0 bg-white border-b border-ink-900/8 flex items-center justify-between px-6 gap-4">
+      <header className="no-print h-14 shrink-0 bg-white border-b border-ink-900/8 flex items-center justify-between px-6 gap-4">
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-8 h-8 rounded bg-ink-900 flex items-center justify-center">
             <FileText size={16} className="text-gold-500" />
@@ -1185,6 +1215,15 @@ export default function DocExtractor() {
               </button>
               <button
                 type="button"
+                onClick={doExportPdf}
+                className="px-3 py-1.5 text-xs font-medium text-cool-500 hover:text-ink-900 border border-ink-900/12 rounded-md transition flex items-center gap-1.5 hover:border-ink-900/25"
+                title={t("dx_export_pdf_hint")}
+              >
+                <Printer size={13} />
+                {t("dx_export_pdf")}
+              </button>
+              <button
+                type="button"
                 onClick={doCopyAll}
                 className="px-3 py-1.5 text-xs font-medium text-cool-500 hover:text-ink-900 border border-ink-900/12 rounded-md transition flex items-center gap-1.5 hover:border-ink-900/25"
               >
@@ -1298,7 +1337,7 @@ export default function DocExtractor() {
       ) : (
         <div className="flex-1 flex overflow-hidden">
           {/* 左：章节目录 */}
-          <aside className="w-72 shrink-0 bg-white border-r border-ink-900/8 overflow-y-auto">
+          <aside className="no-print w-72 shrink-0 bg-white border-r border-ink-900/8 overflow-y-auto">
             <div className="px-4 py-3 border-b border-ink-900/8">
               <div className="text-[11px] uppercase tracking-widest text-cool-500 font-semibold">
                 {t("dx_toc")}
@@ -1375,7 +1414,7 @@ export default function DocExtractor() {
           </aside>
 
           {/* 右：内容 */}
-          <main className="flex-1 overflow-y-auto">
+          <main className="print-area flex-1 overflow-y-auto">
             <div className="max-w-4xl mx-auto px-8 py-8">
               {result.preface.length > 0 && (
                 <SectionView
@@ -1539,7 +1578,7 @@ function SectionView({
               type="button"
               onClick={() => onTranslateSection(id, blocks)}
               disabled={sectionBusy}
-              className="ml-auto px-2.5 py-1 text-[11px] font-medium text-cool-500 hover:text-ink-900 border border-ink-900/12 rounded transition flex items-center gap-1 hover:border-ink-900/25 disabled:opacity-60"
+              className="no-print-inline ml-auto px-2.5 py-1 text-[11px] font-medium text-cool-500 hover:text-ink-900 border border-ink-900/12 rounded transition flex items-center gap-1 hover:border-ink-900/25 disabled:opacity-60"
             >
               {sectionBusy ? (
                 <>
@@ -1599,7 +1638,7 @@ function SectionView({
                         type="button"
                         onClick={() => onTranslateOne(key, source, from)}
                         disabled={busy || sectionBusy}
-                        className="text-[11px] text-cool-500 hover:text-ink-900 border border-ink-900/12 rounded px-2 py-0.5 transition hover:border-ink-900/25 disabled:opacity-60 flex items-center gap-1 opacity-0 group-hover:opacity-100"
+                        className="no-print-inline text-[11px] text-cool-500 hover:text-ink-900 border border-ink-900/12 rounded px-2 py-0.5 transition hover:border-ink-900/25 disabled:opacity-60 flex items-center gap-1 opacity-0 group-hover:opacity-100"
                       >
                         {busy ? (
                           <>

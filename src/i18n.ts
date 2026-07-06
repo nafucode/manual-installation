@@ -951,6 +951,22 @@ export const dict = {
     ru: "Сменить файл",
     vi: "Đổi tệp",
   },
+  dx_export_pdf: {
+    zh: "导出 PDF",
+    en: "Export PDF",
+    fr: "Exporter en PDF",
+    es: "Exportar a PDF",
+    ru: "Экспорт в PDF",
+    vi: "Xuất PDF",
+  },
+  dx_export_pdf_hint: {
+    zh: "调用浏览器打印，选择「另存为 PDF」即可（隐藏侧栏与按钮，A4 排版，章节自动分页）",
+    en: "Uses the browser print dialog — pick 'Save as PDF'. UI hidden, A4 layout, section auto page break.",
+    fr: "Utilise la boîte de dialogue d'impression du navigateur — choisissez « Enregistrer au format PDF ». UI masquée, format A4, saut de page par section.",
+    es: "Usa el diálogo de impresión del navegador — elija «Guardar como PDF». UI oculta, A4, salto de página por sección.",
+    ru: "Использует диалог печати браузера — выберите «Сохранить как PDF». UI скрыт, A4, разрывы по разделам.",
+    vi: "Dùng hộp thoại in của trình duyệt — chọn 'Lưu dưới dạng PDF'. Ẩn giao diện, khổ A4, tự ngắt trang theo chương.",
+  },
   dx_export_project: {
     zh: "保存项目",
     en: "Save Project",
