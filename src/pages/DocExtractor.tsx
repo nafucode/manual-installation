@@ -14,6 +14,8 @@ import {
   Package,
   ClipboardPaste,
   Sparkles,
+  FolderOpen,
+  Save,
 } from "lucide-react";
 import { useT, useI18n, localeOptions, type DictKey } from "@/i18n";
 import {
@@ -313,6 +315,7 @@ export default function DocExtractor() {
   const [error, setError] = useState<string | null>(null);
   const [activeSectionId, setActiveSectionId] = useState<string>("");
   const [showEn, setShowEn] = useState(true);
+  const [showZh, setShowZh] = useState(true);
   const [showImages, setShowImages] = useState(true);
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -876,6 +879,70 @@ export default function DocExtractor() {
     alert(t("dx_copied"));
   };
 
+  /** 项目文件的引用与解析器（.mtp = Manual Translation Project） */
+  const projectInputRef = useRef<HTMLInputElement>(null);
+
+  /** 导出项目：把原文结构 + 图片 + 所有译文 打包成一个 .mtp.json */
+  const doExportProject = () => {
+    if (!result) return;
+    const payload = {
+      version: 1,
+      type: "manual-translation-project",
+      exportedAt: new Date().toISOString(),
+      target,
+      result,
+      translations,
+    };
+    const baseName = result.fileName.replace(/\.docx$/i, "");
+    download(
+      `${baseName}.mtp.json`,
+      JSON.stringify(payload),
+      "application/json",
+    );
+  };
+
+  /** 导入项目：读取 .mtp.json，恢复整个工作区 */
+  const doImportProject = async (file: File) => {
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      if (
+        !data ||
+        data.type !== "manual-translation-project" ||
+        !data.result ||
+        !data.result.sections
+      ) {
+        alert(t("dx_project_invalid"));
+        return;
+      }
+      // 先设置 target，再设置 result，否则会被"换文件时重置翻译"清空
+      const nextTarget: TargetLang | null = data.target ?? null;
+      const nextResult: ExtractResult = data.result;
+      const nextTx: Record<string, string> = data.translations || {};
+      setTarget(nextTarget);
+      setResult(nextResult);
+      setActiveSectionId(nextResult.sections[0]?.id || "");
+      // 用 setTimeout 让 result/target 的副作用先跑完再回填翻译
+      setTimeout(() => setTranslations(nextTx), 0);
+      alert(
+        t("dx_project_imported").replace(
+          "{n}",
+          String(Object.keys(nextTx).length),
+        ),
+      );
+    } catch (err) {
+      console.error("[import project] failed", err);
+      alert(t("dx_project_invalid"));
+    }
+  };
+
+  const onPickProject = () => projectInputRef.current?.click();
+  const onProjectInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (f) doImportProject(f);
+  };
+
   return (
     <div className="h-screen flex flex-col bg-[#F2F4F7]">
       {/* 顶栏 */}
@@ -961,6 +1028,19 @@ export default function DocExtractor() {
               >
                 <Type size={13} />
                 {showEn ? t("dx_hide_en") : t("dx_show_en")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowZh((v) => !v)}
+                className={`px-3 py-1.5 text-xs font-medium border rounded-md transition flex items-center gap-1.5 ${
+                  showZh
+                    ? "text-ink-900 border-ink-900/25 bg-ink-900/5"
+                    : "text-cool-500 border-ink-900/12 hover:border-ink-900/25"
+                }`}
+                title={t("dx_toggle_zh")}
+              >
+                <Type size={13} />
+                {showZh ? t("dx_hide_zh") : t("dx_show_zh")}
               </button>
               <button
                 type="button"
@@ -1087,6 +1167,24 @@ export default function DocExtractor() {
 
               <button
                 type="button"
+                onClick={doExportProject}
+                className="px-3 py-1.5 text-xs font-medium text-cool-500 hover:text-ink-900 border border-ink-900/12 rounded-md transition flex items-center gap-1.5 hover:border-ink-900/25"
+                title={t("dx_export_project_hint")}
+              >
+                <Save size={13} />
+                {t("dx_export_project")}
+              </button>
+              <button
+                type="button"
+                onClick={onPickProject}
+                className="px-3 py-1.5 text-xs font-medium text-cool-500 hover:text-ink-900 border border-ink-900/12 rounded-md transition flex items-center gap-1.5 hover:border-ink-900/25"
+                title={t("dx_import_project_hint")}
+              >
+                <FolderOpen size={13} />
+                {t("dx_import_project")}
+              </button>
+              <button
+                type="button"
                 onClick={doCopyAll}
                 className="px-3 py-1.5 text-xs font-medium text-cool-500 hover:text-ink-900 border border-ink-900/12 rounded-md transition flex items-center gap-1.5 hover:border-ink-900/25"
               >
@@ -1149,24 +1247,36 @@ export default function DocExtractor() {
               <br />
               {t("dx_upload_desc_2")}
             </div>
-            <button
-              type="button"
-              onClick={onPick}
-              disabled={loading}
-              className="px-6 py-2.5 bg-ink-900 text-white text-sm font-semibold rounded-md hover:bg-ink-800 transition inline-flex items-center gap-2 disabled:opacity-60"
-            >
-              {loading ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" />
-                  {t("dx_parsing")}
-                </>
-              ) : (
-                <>
-                  <Upload size={16} />
-                  {t("dx_pick_file")}
-                </>
-              )}
-            </button>
+            <div className="flex items-center justify-center gap-3 flex-wrap">
+              <button
+                type="button"
+                onClick={onPick}
+                disabled={loading}
+                className="px-6 py-2.5 bg-ink-900 text-white text-sm font-semibold rounded-md hover:bg-ink-800 transition inline-flex items-center gap-2 disabled:opacity-60"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    {t("dx_parsing")}
+                  </>
+                ) : (
+                  <>
+                    <Upload size={16} />
+                    {t("dx_pick_file")}
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={onPickProject}
+                disabled={loading}
+                className="px-6 py-2.5 bg-white text-ink-900 text-sm font-semibold border border-ink-900/15 rounded-md hover:border-ink-900/40 transition inline-flex items-center gap-2 disabled:opacity-60"
+                title={t("dx_import_project_hint")}
+              >
+                <FolderOpen size={16} />
+                {t("dx_import_project")}
+              </button>
+            </div>
             {error && (
               <div className="mt-6 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-3">
                 {error}
@@ -1275,6 +1385,7 @@ export default function DocExtractor() {
                   titleEn=""
                   blocks={result.preface}
                   showEn={showEn}
+                  showZh={showZh}
                   showImages={showImages}
                   target={target}
                   translations={translations}
@@ -1294,6 +1405,7 @@ export default function DocExtractor() {
                   titleEn={sec.titleEn}
                   blocks={sec.blocks}
                   showEn={showEn}
+                  showZh={showZh}
                   showImages={showImages}
                   target={target}
                   translations={translations}
@@ -1361,6 +1473,13 @@ export default function DocExtractor() {
           </div>
         </div>
       )}
+      <input
+        ref={projectInputRef}
+        type="file"
+        accept=".json,.mtp,application/json"
+        className="hidden"
+        onChange={onProjectInput}
+      />
     </div>
   );
 }
@@ -1372,6 +1491,7 @@ function SectionView({
   titleEn,
   blocks,
   showEn,
+  showZh,
   showImages,
   target,
   translations,
@@ -1387,6 +1507,7 @@ function SectionView({
   titleEn: string;
   blocks: Block[];
   showEn: boolean;
+  showZh: boolean;
   showImages: boolean;
   target: TargetLang | null;
   translations: Record<string, string>;
@@ -1398,6 +1519,11 @@ function SectionView({
 }) {
   const isRtl = target === "ar";
   const sectionBusy = busySection === id;
+  const primaryTitle = showZh
+    ? titleZh || titleEn
+    : titleEn || titleZh;
+  const showSubtitle =
+    showZh && showEn && titleZh && titleEn && primaryTitle !== titleEn;
   return (
     <section id={id} className="mb-10 scroll-mt-4">
       <div className="border-b border-ink-900/10 pb-3 mb-5">
@@ -1406,7 +1532,7 @@ function SectionView({
             <span className="font-mono text-sm text-cool-500">{number}</span>
           )}
           <h2 className="text-xl font-bold text-ink-900">
-            {titleZh || titleEn}
+            {primaryTitle}
           </h2>
           {target && (
             <button
@@ -1429,7 +1555,7 @@ function SectionView({
             </button>
           )}
         </div>
-        {showEn && titleZh && titleEn && (
+        {showSubtitle && (
           <div className="text-sm italic text-cool-500 mt-1">{titleEn}</div>
         )}
       </div>
@@ -1444,7 +1570,7 @@ function SectionView({
             const busy = busyKeys.has(key);
             return (
               <div key={i} className="text-[15px] leading-relaxed group">
-                {b.zh && (
+                {showZh && b.zh && (
                   <div className="text-ink-900 whitespace-pre-wrap">{b.zh}</div>
                 )}
                 {showEn && b.en && (
